@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Holmovimiento to video converter</title>
+
+    <script language="javascript" type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+
+    <script language="javascript" type="text/javascript">
+        const FRAME_WIDTH = 700;
+        const FRAME_HEIGHT = 700;
+        const ANGLE = 45; // degrees
+
+        // These can be edited
+        var FPS = 60;
+        var LOOP_FRAMES = 360
+    </script>
+
+    <!---Framework-->
+    <script>
+        function drawPolygon(x, y, z, radius, npoints, rotation) {
+            rotate(rotation);
+            let angle = TWO_PI / npoints;
+            beginShape();
+            for (let a = 0; a < TWO_PI; a += angle) {
+                let sx = x + cos(a) * radius;
+                let sy = y + sin(a) * radius;
+                vertex(sx, sy, z);
+            }
+            endShape(CLOSE);
+        }
+
+        class GradientBackground {
+            constructor(color1, color2) {
+                this.color1 = color1;
+                this.color2 = color2;
+            }
+            update() {
+                noFill();
+                // Top to bottom gradient
+                let x = -width;
+                let y = -height;
+                let w = 2 * width;
+                let h = 2 * height;
+
+                for (let i = y; i <= y + h; i++) {
+                    let inter = map(i, y, y + h, 0, 1);
+                    let c = lerpColor(this.color1, this.color2, inter);
+                    stroke(c);
+                    line(x, i, x + w, i);
+                }
+            }
+        }
+
+        class MonochromeBackground {
+            constructor(color) {
+                this.color = color;
+            }
+            update() {
+                background(this.color);
+            }
+        }
+
+        class BlackBackground {
+            constructor() {
+            }
+            update() {
+                background(30);
+            }
+        }
+        class WhiteBackground {
+            constructor() {
+            }
+            update() {
+                background(230);
+            }
+        }
+
+
+        class Vase {
+            constructor(getSides, getSwirl, getRotation, getRadius, getX, getY, getHeight, getDh, getStrokeWeight, getStrokeColor, getFillColor) {
+                // f(z, t)
+                this.getSides = getSides;
+                // f(t)
+                this.getSwirl = getSwirl;
+                // f(t)
+                this.getRotation = getRotation;
+                // f(z, t)
+                this.getRadius = getRadius;
+
+                // f(z, t)
+                this.getX = getX;
+                // f(z, t)
+                this.getY = getY;
+
+                // f(t)
+                this.getHeight = getHeight;
+                // f(z, t)
+                this.getDh = getDh;
+                this.dh;
+
+                // f(z, t)
+                this.getStrokeWeight = getStrokeWeight;
+                // f(z, t)
+                this.getStrokeColor = getStrokeColor;
+                // f(z, t)
+                this.getFillColor = getFillColor;
+
+            }
+            update() {
+                // draw
+                let t = frameCount;
+                rotate(this.getRotation(t));
+                let height = this.getHeight(t);
+                for (let z = 0; z < height; z += this.dh) {
+                    this.dh = this.getDh(z, t);
+                    let r = sqrt(height * height - z * z);
+
+                    strokeWeight(this.getStrokeWeight(z, t));
+                    stroke(this.getStrokeColor(z, t));
+                    fill(this.getFillColor(z, t));
+                    drawPolygon(this.getX(z, t), this.getY(z, t), z, this.getRadius(z, t), this.getSides(z, t), this.getSwirl(z, t));
+                }
+            }
+        }
+
+
+        class Sphere {
+            constructor(getSides, getSwirl, getRotation, getX, getY, getHeight, getDh, getStrokeWeight, getStrokeColor, getFillColor) {
+                // f(z, t)
+                this.getSides = getSides;
+                // f(t)
+                this.getSwirl = getSwirl;
+                // f(t)
+                this.getRotation = getRotation;
+                // f(z, t)
+                this.getX = getX;
+                // f(z, t)
+                this.getY = getY;
+
+                // f(t)
+                this.getHeight = getHeight;
+                // f(z, t)
+                this.getDh = getDh;
+                this.dh;
+
+                // f(z, t)
+                this.getStrokeWeight = getStrokeWeight;
+                // f(z, t)
+                this.getStrokeColor = getStrokeColor;
+                // f(z, t)
+                this.getFillColor = getFillColor;
+            }
+
+            update() {
+                let t = frameCount;
+                rotate(this.getRotation(t));
+                let height = this.getHeight(t);
+                for (let z = 0; z < height; z += this.dh) {
+                    this.dh = this.getDh(z, t);
+                    let r = sqrt(height * height - z * z);
+
+                    strokeWeight(this.getStrokeWeight(z, t));
+                    stroke(this.getStrokeColor(z, t));
+                    fill(this.getFillColor(z, t));
+
+                    drawPolygon(this.getX(z, t), this.getY(z, t), z + this.getHeight(t) / 2, r, this.getSides(z, t), this.getSwirl(z, t));
+                    drawPolygon(this.getX(z, t), this.getY(z, t), -z + this.getHeight(t) / 2, r, this.getSides(z, t), this.getSwirl(z, t));
+                }
+            }
+        }
+
+
+        class SineWave3D {
+            constructor(getSides, getSwirl, getRotation, getRadius, getX, getY, getHeight, getDr, getStrokeWeight, getStrokeColor, getFillColor) {
+                // f(r, t)
+                this.getSides = getSides;
+                // f(t)
+                this.getSwirl = getSwirl;
+                // f(t)
+                this.getRotation = getRotation;
+                // f(t) !!!! In this case function of t only
+                this.getRadius = getRadius;
+                // f(r, t)
+                this.getX = getX;
+                // f(r, t)
+                this.getY = getY;
+
+                // f(r, t) !!!!! In this case function of r and t
+                this.getHeight = getHeight;
+                // f(r, t)
+                this.getDr = getDr;
+                // f(r, t)
+                this.dr;
+
+                // f(r, t)
+                this.getStrokeWeight = getStrokeWeight;
+                // f(r, t)
+                this.getStrokeColor = getStrokeColor;
+                // f(r, t)
+                this.getFillColor = getFillColor;
+            }
+
+            update() {
+                let t = frameCount;
+                rotate(this.getRotation(t));
+                let radius = this.getRadius(t);
+                for (let r = 10; r < radius; r += this.dr) {
+                    this.dr = this.getDr(r, t);
+
+                    strokeWeight(this.getStrokeWeight(r, t));
+                    stroke(this.getStrokeColor(r, t));
+                    fill(this.getFillColor(r, t));
+
+                    let z = this.getHeight(r, t);
+                    drawPolygon(this.getX(z, t), this.getY(z, t), z, r, this.getSides(z, t), this.getSwirl(z, t));
+
+                }
+            }
+        }
+
+
+
+
+    </script>
+
+    <!--Main-->
+    <script id="main-code">
+        let bg;
+        let model;
+        let canvas;
+        let capturer;
+        let animationStarted = false;
+
+        function setup() {
+            canvas = createCanvas(FRAME_WIDTH, FRAME_HEIGHT, WEBGL).canvas;
+            document.getElementById("embedded-block").appendChild(canvas);
+            frameRate(FPS);
+        }
+
+        function startAnimation() {
+            bg = getBackground();
+            model = getModel();
+            animationStarted = true;
+        }
+
+        function stopAnimation() {
+            animationStarted = false;
+        }
+
+        function draw() {
+            if (!animationStarted)
+                return;
+
+            // Animate
+            bg.update();
+            if (model instanceof SineWave3D) {
+                translate(0, 0, 150);
+                rotateX(radians(ANGLE));
+                model.update();
+                translate(0, 0, -50);
+            }
+            else {
+                translate(0, 0, model.getHeight(frameCount)); // won't work for sine but works ok for first two
+                rotateX(radians(ANGLE));
+                translate(0, 0, -model.getHeight(frameCount) / 3);
+                model.update();
+            }
+        }
+    </script>
+
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: black;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        input[type="text"] {
+            font-family: inherit;
+            /* 1 */
+            font-size: inherit;
+            /* 1 */
+            line-height: inherit;
+            /* 1 */
+            margin: 0;
+            /* 2 */
+        }
+
+        .text-field {
+            margin-bottom: 1rem;
+        }
+
+        .text-field__label {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .text-field__input {
+            display: block;
+            width: 100%;
+            height: calc(2.25rem + 2px);
+            padding: 0.375rem 0.75rem;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 400;
+            line-height: 1.5;
+            color: #212529;
+            background-color: #fff;
+            background-clip: padding-box;
+            border: 1px solid #bdbdbd;
+            border-radius: 0.25rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        button {
+            background-color: #555555;
+            font-size: 18px;
+            padding: 16px 16px;
+            border-radius: 4px;
+            border: 2px solid #e2e2e2;
+            color: white;
+
+            -webkit-transition-duration: 0.4s;
+            /* Safari */
+            transition-duration: 0.4s;
+        }
+
+        a {
+            color: white;
+        }
+
+        canvas {
+            padding: 0;
+            margin: auto;
+            display: block;
+            position: relative;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100vmin;
+            height: 100vmin;
+        }
+
+        div {
+            margin-top: auto;
+            margin-bottom: auto;
+            text-align: center;
+            padding: 20px;
+        }
+
+
+        
+
+
+    </style>
+</head>
+
+
+
+<body>
+    <div class="text-field">
+        <label class="text-field__label" for="url-text">OpenSea URL</label>
+        <input class="text-field__input" type="text" name="url-text" id="url-text" placeholder="OpenSea URL">
+      </div>
+
+    <div><button id="find-button">Find my Holmovimiento</button></div>
+    <div id="embedded-block"></div>
+</body>
+<script>
+    const openseaApi = 'https://api.opensea.io/api/v1/asset/';
+    const assetInfoSearchString = "//Holmovimiento No";
+
+    let urlText = document.getElementById("url-text");
+    let findButton = document.getElementById("find-button");
+    let embeddedBlock = document.getElementById("embedded-block");
+
+    findButton.addEventListener("click", function () {
+        httpGetAsync(openseaApi + extractContractAdress(urlText.value) + "/" + extractTokenID(urlText.value), function (responseText) {
+            let animationURL = JSON.parse(responseText)["animation_url"];
+            console.log(animationURL);
+
+            httpGetAsync(animationURL, function (loadedHTML) {
+                var parser = new DOMParser();
+                var htmlDoc = parser.parseFromString(loadedHTML, 'text/html');
+                var scriptss = htmlDoc.querySelectorAll("script");
+                scriptss.forEach((el) => {
+                    if (el.innerHTML.includes(assetInfoSearchString)) {
+                        let oldScriptConfig = document.getElementById("asset-config");
+                        if (oldScriptConfig != null)
+                            oldScriptConfig.parentNode.removeChild(oldScriptConfig);
+
+                        let script = document.createElement("script");
+                        script.setAttribute("id", "asset-config")
+                        script.type = "text/javascript";
+                        script.innerHTML = el.innerHTML;
+                        document.getElementsByTagName('head')[0].appendChild(script);
+                        startAnimation();
+                        startRecording();
+                    }
+                });
+            });
+        });
+    });
+
+
+
+    function extractContractAdress(assetUrl) {
+        let splitted = assetUrl.split("/");
+        return splitted[splitted.length - 2]
+    }
+
+    function extractTokenID(assetUrl) {
+        let splitted = assetUrl.split("/");
+        return splitted[splitted.length - 1]
+    }
+
+    function httpGetAsync(theUrl, callback) {
+        var xmlHttp = new XMLHttpRequest();
+        xmlHttp.onreadystatechange = function () {
+            if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+                callback(xmlHttp.responseText);
+        }
+        xmlHttp.open("GET", theUrl, true);
+        xmlHttp.send(null);
+    }
+</script>
+
+
+
+<script>
+    let saveGifButton = document.getElementById("save-gif-button");
+
+    saveGifButton.addEventListener("click", function () {
+        console.log("Saving");
+        startAnimation();
+        startRecording();
+    });
+
+    function startRecording() {
+
+        const chunks = []; // here we will store our recorded media chunks (Blobs)
+        const stream = canvas.captureStream(FPS); // grab our canvas MediaStream
+        const rec = new MediaRecorder(stream); // init the recorder
+        // every time the recorder has new data, we will store it in our array
+        rec.ondataavailable = e => chunks.push(e.data);
+        // only when the recorder stops, we construct a complete Blob from all the chunks
+        rec.onstop = e => exportVid(new Blob(chunks, { type: 'video/webm' }));
+
+        rec.start();
+        setTimeout(() => {
+            rec.stop();
+        }
+            , 1000 * LOOP_FRAMES / FPS);
+    }
+
+    function exportVid(blob) {
+        const a = document.createElement('a');
+        const button = document.createElement('button');
+        button.setAttribute("id", "download-button");
+        document.getElementById("embedded-block").appendChild(button);
+        button.appendChild(a);
+        a.download = 'myvid.webm';
+        a.href = URL.createObjectURL(blob);
+        a.textContent = 'Download the video';
+    }
+
+</script>
+
+</html>
